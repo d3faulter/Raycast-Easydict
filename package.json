@@ -743,6 +743,14 @@
       "default": true
     },
     {
+      "type": "checkbox",
+      "name": "enableWiktionaryDictionary",
+      "label": "Wiktionary Dictionary",
+      "required": false,
+      "description": "Free community dictionary for thousands of languages, eg. Danish, Norwegian, Swedish. Shows English glosses, and translations when looking up English words.",
+      "default": true
+    },
+    {
       "title": "Translation Services",
       "type": "checkbox",
       "name": "enableOpenAITranslate",

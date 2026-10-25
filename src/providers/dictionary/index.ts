@@ -9,6 +9,7 @@ import { checkIsWord } from "@/providers/shared/utils";
 
 import type { BaseDictionaryProvider } from "./base";
 import { LingueeDictionaryProvider } from "./linguee";
+import { WiktionaryDictionaryProvider } from "./wiktionary";
 import { YoudaoDictionaryProvider } from "./youdao";
 
 export interface DictionaryServiceConfig extends RuntimeServiceConfig {
@@ -21,6 +22,7 @@ export interface DictionaryServiceConfig extends RuntimeServiceConfig {
 const builtinProviderClasses = {
   [DictionaryType.Youdao]: YoudaoDictionaryProvider,
   [DictionaryType.Linguee]: LingueeDictionaryProvider,
+  [DictionaryType.Wiktionary]: WiktionaryDictionaryProvider,
 } satisfies Record<(typeof builtinDictionaryProviders)[number]["type"], new () => BaseDictionaryProvider>;
 
 export const builtinDictionaryServices: DictionaryServiceConfig[] = builtinDictionaryProviders.map((service) => ({
@@ -28,7 +30,9 @@ export const builtinDictionaryServices: DictionaryServiceConfig[] = builtinDicti
   cacheIdentity: service.type,
   enabled: (query) =>
     myPreferences[service.preference] &&
-    (service.type !== DictionaryType.Youdao || (getYoudaoWebDictionaryURL(query) !== undefined && checkIsWord(query))),
+    (service.type === DictionaryType.Youdao
+      ? getYoudaoWebDictionaryURL(query) !== undefined && checkIsWord(query)
+      : service.type !== DictionaryType.Wiktionary || checkIsWord(query)),
   createProvider: () => new builtinProviderClasses[service.type](),
   canTriggerAutomaticAudio: true,
 }));

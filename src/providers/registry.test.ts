@@ -41,6 +41,7 @@ vi.mock("@raycast/api", () => ({
 const defaultOrder = [
   "builtin:dictionary:Youdao Dictionary",
   "builtin:dictionary:Linguee Dictionary",
+  "builtin:dictionary:Wiktionary Dictionary",
   "builtin:translation:DeepL Translate",
   "builtin:translation:DeepLX Translate",
   "builtin:translation:Google Translate",
@@ -79,7 +80,7 @@ describe("combined provider registry", () => {
     expect(services.sort((left, right) => left.order - right.order).map((service) => service.providerKey)).toEqual(
       defaultOrder,
     );
-    expect(services.map((service) => service.order)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(services.map((service) => service.order)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     for (const service of services) {
       expect(service.id).toBe(`static:${service.type}`);
       expect(service.createProvider().type).toBe(service.type);
