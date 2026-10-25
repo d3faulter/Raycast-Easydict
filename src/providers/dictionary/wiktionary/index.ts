@@ -9,15 +9,20 @@ import { logTrace } from "@/shared/logger";
 
 import { buildWiktionaryContent } from "./content";
 import {
+  getWiktionarySectionIndex,
   hasWiktionaryTranslationSubpage,
   parseWiktionaryDefinitions,
+  parseWiktionaryForms,
+  parseWiktionaryPronunciation,
   parseWiktionaryTranslations,
+  type WiktionaryHeadwordForms,
   type WiktionaryTranslationGroup,
 } from "./parse";
 import { getWiktionaryLanguageCodes, getWiktionaryLanguageName, getWiktionaryTitle } from "./url";
 
 /** Wikimedia asks API clients to identify themselves. */
 const headers = { "User-Agent": "Raycast-Easydict (https://github.com/tisfeng/Raycast-Easydict)" };
+const baseURL = "https://en.wiktionary.org";
 
 /**
  * Wiktionary dictionary provider, free and keyless.
@@ -37,41 +42,63 @@ export class WiktionaryDictionaryProvider extends BaseDictionaryProvider {
 
     for (const candidate of candidates) {
       const query = { ...queryWordInfo, word: candidate };
-      const definitions = parseWiktionaryDefinitions(
-        await this.fetchPage(
-          `https://en.wiktionary.org/api/rest_v1/page/definition/${getWiktionaryTitle(candidate)}`,
-          "json",
-          signal,
-        ),
-        getWiktionaryLanguageName(query.fromLanguage),
-      );
-      const translations =
+      const title = getWiktionaryTitle(candidate);
+      const languageName = getWiktionaryLanguageName(query.fromLanguage);
+      const [definitionPayload, wikitext] = await Promise.all([
+        this.fetchPage(`${baseURL}/api/rest_v1/page/definition/${title}`, "json", signal),
+        this.fetchPage(`${baseURL}/w/index.php?title=${title}&action=raw`, "text", signal),
+      ]);
+      const definitions = parseWiktionaryDefinitions(definitionPayload, languageName);
+      if (typeof wikitext !== "string" && !definitions.length) continue;
+
+      const page = typeof wikitext === "string" ? wikitext : "";
+      const [translations, forms] = await Promise.all([
         query.fromLanguage === "en" && query.toLanguage !== "en"
-          ? await this.fetchTranslations(candidate, getWiktionaryLanguageCodes(query.toLanguage), signal)
-          : [];
-      const content = buildWiktionaryContent(query, definitions, translations);
+          ? this.fetchTranslations(title, page, getWiktionaryLanguageCodes(query.toLanguage), signal)
+          : [],
+        this.fetchForms(title, getWiktionarySectionIndex(page, languageName), signal),
+      ]);
+      const pronunciation = parseWiktionaryPronunciation(
+        page,
+        languageName,
+        getWiktionaryLanguageCodes(query.fromLanguage),
+      );
+      const content = buildWiktionaryContent(query, { definitions, translations, pronunciation, forms });
       if (content.sections.length) return content;
     }
     return { kind: "dictionary", query: queryWordInfo, sections: [] };
   }
 
   private async fetchTranslations(
-    word: string,
+    title: string,
+    wikitext: string,
     languageCodes: string[],
     signal?: AbortSignal,
   ): Promise<WiktionaryTranslationGroup[]> {
-    const rawURL = (title: string) => `https://en.wiktionary.org/w/index.php?title=${title}&action=raw`;
-    const title = getWiktionaryTitle(word);
-    const wikitext = await this.fetchPage(rawURL(title), "text", signal);
-    if (typeof wikitext !== "string") return [];
-
     const subpage = hasWiktionaryTranslationSubpage(wikitext)
-      ? await this.fetchPage(rawURL(`${title}/translations`), "text", signal)
+      ? await this.fetchPage(`${baseURL}/w/index.php?title=${title}/translations&action=raw`, "text", signal)
       : undefined;
     return [
       ...(typeof subpage === "string" ? parseWiktionaryTranslations(subpage, languageCodes) : []),
       ...parseWiktionaryTranslations(wikitext, languageCodes),
     ];
+  }
+
+  /** Renders only the source-language section, whose headword lines carry the inflections. */
+  private async fetchForms(
+    title: string,
+    sectionIndex: number | undefined,
+    signal?: AbortSignal,
+  ): Promise<WiktionaryHeadwordForms[]> {
+    if (sectionIndex === undefined) return [];
+    const payload = await this.fetchPage(
+      `${baseURL}/w/api.php?action=parse&page=${title}&prop=text&section=${sectionIndex}&format=json&formatversion=2&disableeditsection=1`,
+      "json",
+      signal,
+    );
+    const parsed = typeof payload === "object" && payload !== null && "parse" in payload ? payload.parse : undefined;
+    const html = typeof parsed === "object" && parsed !== null && "text" in parsed ? parsed.text : undefined;
+    return typeof html === "string" ? parseWiktionaryForms(html) : [];
   }
 
   /** Missing pages are an ordinary "no entry" result, not a request failure. */

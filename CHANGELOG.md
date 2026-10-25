@@ -1,5 +1,11 @@
 # `Easydict` Changelog
 
+## [v3.6.0] - {PR_MERGE_DATE}
+
+### ✨ New Features
+
+- Added **Wiktionary Dictionary**, a free dictionary that needs no API key and covers thousands of languages. Words in other languages show English meanings; English words show translations into your target language. Results include parts of speech, IPA pronunciation, recorded audio where available, word forms, and usage examples. It fills gaps where Linguee has no reviewed dictionary, such as English ↔ Danish. Turn it off with the **Wiktionary Dictionary** preference.
+
 ## [v3.5.0] - 2026-10-02
 
 ### ✨ New Features
