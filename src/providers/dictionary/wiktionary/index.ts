@@ -9,7 +9,7 @@ import { logTrace } from "@/shared/logger";
 
 import { buildWiktionaryContent } from "./content";
 import {
-  getWiktionarySectionIndex,
+  getWiktionaryHeadwordWikitext,
   hasWiktionaryTranslationSubpage,
   parseWiktionaryDefinitions,
   parseWiktionaryForms,
@@ -56,7 +56,7 @@ export class WiktionaryDictionaryProvider extends BaseDictionaryProvider {
         query.fromLanguage === "en" && query.toLanguage !== "en"
           ? this.fetchTranslations(title, page, getWiktionaryLanguageCodes(query.toLanguage), signal)
           : [],
-        this.fetchForms(title, getWiktionarySectionIndex(page, languageName), signal),
+        this.fetchForms(title, getWiktionaryHeadwordWikitext(page, languageName), signal),
       ]);
       const pronunciation = parseWiktionaryPronunciation(
         page,
@@ -84,17 +84,18 @@ export class WiktionaryDictionaryProvider extends BaseDictionaryProvider {
     ];
   }
 
-  /** Renders only the source-language section, whose headword lines carry the inflections. */
+  /** Renders only the headword templates, whose output carries the inflections; `title` sets their page name. */
   private async fetchForms(
     title: string,
-    sectionIndex: number | undefined,
+    headwordWikitext: string,
     signal?: AbortSignal,
   ): Promise<WiktionaryHeadwordForms[]> {
-    if (sectionIndex === undefined) return [];
+    if (!headwordWikitext) return [];
     const payload = await this.fetchPage(
-      `${baseURL}/w/api.php?action=parse&page=${title}&prop=text&section=${sectionIndex}&format=json&formatversion=2&disableeditsection=1`,
+      `${baseURL}/w/api.php?action=parse&title=${title}&prop=text&contentmodel=wikitext&format=json&formatversion=2&disableeditsection=1&disablelimitreport=1`,
       "json",
       signal,
+      new URLSearchParams({ text: headwordWikitext }),
     );
     const parsed = typeof payload === "object" && payload !== null && "parse" in payload ? payload.parse : undefined;
     const html = typeof parsed === "object" && parsed !== null && "text" in parsed ? parsed.text : undefined;
@@ -102,9 +103,20 @@ export class WiktionaryDictionaryProvider extends BaseDictionaryProvider {
   }
 
   /** Missing pages are an ordinary "no entry" result, not a request failure. */
-  private async fetchPage(url: string, responseType: "json" | "text", signal?: AbortSignal): Promise<unknown> {
+  private async fetchPage(
+    url: string,
+    responseType: "json" | "text",
+    signal?: AbortSignal,
+    body?: URLSearchParams,
+  ): Promise<unknown> {
     logTrace(this.type, `url: ${url}`);
-    const response = await timedFetch.raw(url, { headers, signal, responseType, ignoreResponseError: true });
+    const response = await timedFetch.raw(url, {
+      headers,
+      signal,
+      responseType,
+      ignoreResponseError: true,
+      ...(body && { method: "POST", body }),
+    });
     if (response.status === 404) return undefined;
     if (!response.ok) throw new Error(`Wiktionary request failed: ${response.status}`);
     return response._data;

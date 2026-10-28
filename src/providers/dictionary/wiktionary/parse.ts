@@ -105,17 +105,23 @@ function getLanguageSection(wikitext: string, languageName: string): string {
 }
 
 /**
- * MediaWiki numbers every heading on the page in order, which `action=parse&section=N` uses.
+ * Part-of-speech headings with the headword template under each, eg. `===Noun===\n{{da-noun|et|e}}`.
+ *
+ * Rendering only these takes about a second; the whole section of a long page such as `house` takes several.
  */
-export function getWiktionarySectionIndex(wikitext: string, languageName: string): number | undefined {
-  let index = 0;
-  for (const line of wikitext.split("\n")) {
-    const heading = line.match(headingPattern);
-    if (!heading) continue;
-    index++;
-    if (heading[1] === "==" && heading[2] === languageName) return index;
+export function getWiktionaryHeadwordWikitext(wikitext: string, languageName: string): string {
+  const lines: string[] = [];
+  let heading: string | undefined;
+  for (const line of getLanguageSection(wikitext, languageName).split("\n")) {
+    const match = line.match(headingPattern);
+    if (match) {
+      heading = partsOfSpeech.has(match[2]) ? line.trim() : undefined;
+    } else if (heading && line.trim()) {
+      if (line.trimStart().startsWith("{{")) lines.push(heading, line.trim());
+      heading = undefined;
+    }
   }
-  return undefined;
+  return lines.join("\n");
 }
 
 /**

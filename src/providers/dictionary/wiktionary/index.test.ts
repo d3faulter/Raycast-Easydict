@@ -20,8 +20,8 @@ const pages: Record<string, () => unknown> = {
   "title=hus&action=raw": () => fixture("hus.wikitext"),
   "title=house&action=raw": () => fixture("house.wikitext"),
   "title=house/translations&action=raw": () => fixture("house-translations.wikitext"),
-  "page=hus&prop=text&section=29&": () => JSON.parse(fixture("parse-hus.json")),
-  "page=house&prop=text&section=1&": () => JSON.parse(fixture("parse-house.json")),
+  "action=parse&title=hus&prop=text&contentmodel=wikitext&": () => JSON.parse(fixture("parse-hus.json")),
+  "action=parse&title=house&prop=text&contentmodel=wikitext&": () => JSON.parse(fixture("parse-house.json")),
 };
 
 beforeEach(() => {
@@ -72,6 +72,12 @@ describe("Wiktionary dictionary", () => {
       headword: { word: "hus", partOfSpeech: "verb" },
       entries: [{ text: "imperative of huse", partOfSpeech: "v", prominent: false, frequency: "special-forms" }],
     });
+    // Only the Danish headword templates are rendered, not the whole section.
+    const formsCall = fetchRaw.mock.calls.find(([url]) => String(url).includes("action=parse"));
+    expect(formsCall?.[1]).toMatchObject({ method: "POST" });
+    expect((formsCall?.[1].body as URLSearchParams).get("text")).toBe(
+      "===Noun===\n{{da-noun|et|e}}\n===Verb===\n{{head|da|verb form}}",
+    );
   });
 
   it("shows Danish translations, forms, and examples for an English word", async () => {
