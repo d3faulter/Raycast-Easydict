@@ -6,7 +6,7 @@
 
 - Added **Wiktionary Dictionary**, a free dictionary that needs no API key and covers thousands of languages. Words in other languages show English meanings; English words show translations into your target language. Results include parts of speech, IPA pronunciation, recorded audio where available, word forms, and usage examples. It fills gaps where Linguee has no reviewed dictionary, such as English ↔ Danish. Turn it off with the **Wiktionary Dictionary** preference.
 
-- Added **Search Selected Text**, which reads the selection before Raycast opens and then starts a fresh search. Pressing its hotkey on a new selection replaces a search that is still open, where re-invoking **Search Word** only brings the previous search back.
+- Added **Search Selected Text**, which reads the selection before Raycast opens and then starts a fresh search. Pressing its hotkey on a new selection replaces a search that is still open, where re-invoking **Search Word** only brings the previous search back. With nothing selected, it reopens the last search.
 
 ## [v3.5.0] - 2026-10-02
 

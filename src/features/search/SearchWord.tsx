@@ -24,6 +24,7 @@ import {
 import { logError, logTrace } from "@/shared/logger";
 
 import { ListActionPanel } from "./ActionPanel";
+import { setLastQuery } from "./lastQuery";
 import { handleNativeJSONFallback } from "./nativeJSONFallback";
 import { useDebouncedQuery } from "./useDebouncedQuery";
 import { useFirstItemAnchor } from "./useFirstItemAnchor";
@@ -226,6 +227,7 @@ export default function SearchWord({ initialQueryText, fallbackText, skipSelecte
     setInputText(normalizedText);
     const trimText = normalizedText.trim();
     setSearchText(trimText);
+    setLastQuery(trimText);
 
     if (trimText.length === 0) {
       debouncedQuery.cancel();
