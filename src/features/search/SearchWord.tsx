@@ -35,9 +35,10 @@ import { getWordAccessories } from "./WordAccessories";
 interface SearchWordProps {
   initialQueryText?: string;
   fallbackText?: string;
+  skipSelectedText?: boolean;
 }
 
-export default function SearchWord({ initialQueryText, fallbackText }: SearchWordProps) {
+export default function SearchWord({ initialQueryText, fallbackText, skipSelectedText }: SearchWordProps) {
   const trimQueryText = initialQueryText ? initialQueryText.trim() : fallbackText?.trim();
 
   const { isShowingReleasePrompt, hideReleasePrompt } = useReleasePrompt();
@@ -169,7 +170,7 @@ export default function SearchWord({ initialQueryText, fallbackText }: SearchWor
 
     if (userInputText?.length) {
       updateInputTextAndQueryText(userInputText, false);
-    } else if (myPreferences.enableAutomaticQuerySelectedText) {
+    } else if (myPreferences.enableAutomaticQuerySelectedText && !skipSelectedText) {
       querySelectedText();
     }
   }
