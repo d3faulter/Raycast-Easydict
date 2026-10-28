@@ -129,14 +129,29 @@ function dictionarySection(
         const example = entry.firstExampleTranslation ?? "";
         const pos = entry.partOfSpeech ? `${entry.partOfSpeech}${note || example ? "." : ""}` : "";
         const subtitle = `${pos}${note}       ${example}`;
-        add({
-          kind: "equivalent",
-          title: entry.text,
-          subtitle,
-          copyText: `${entry.text} ${subtitle}`,
-          frequency: entry.frequency,
-          prominent: true,
-        });
+        const examples = entry.examples ?? [];
+        add(
+          {
+            kind: "equivalent",
+            title: entry.text,
+            subtitle,
+            copyText: `${entry.text} ${subtitle}`,
+            frequency: entry.frequency,
+            prominent: true,
+          },
+          examples.length
+            ? () =>
+                [
+                  `**${plainText(entry.text)}**${entry.partOfSpeech ? `  ${plainText(entry.partOfSpeech)}.` : ""}`,
+                  examples
+                    .map(
+                      (item) =>
+                        `- **${plainText(item.sentence)}**${item.translation ? `  \n  ${plainText(item.translation)}` : ""}`,
+                    )
+                    .join("\n\n"),
+                ].join("\n\n")
+            : undefined,
+        );
       }
       const last = unfeatured.at(-1);
       if (last) {

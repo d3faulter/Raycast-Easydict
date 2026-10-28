@@ -7,12 +7,15 @@ import type {
   WiktionaryDefinitionEntry,
   WiktionaryHeadwordForms,
   WiktionaryPronunciation,
+  WiktionarySense,
   WiktionaryTranslationGroup,
 } from "./parse";
 
 const maxGroups = 8;
-const maxGlosses = 6;
-const maxExamples = 3;
+const maxSenses = 6;
+const maxDefinitions = 5;
+/** Short glosses such as `house; building` are joined for the first row; long English definitions are not. */
+const maxPrimaryLength = 60;
 
 export interface WiktionaryLookup {
   definitions: WiktionaryDefinitionEntry[];
@@ -21,21 +24,22 @@ export interface WiktionaryLookup {
   forms: WiktionaryHeadwordForms[];
 }
 
+/** The list view appends the period, as for Linguee, eg. `adj.`. */
 const partOfSpeechAbbreviations: Record<string, string> = {
-  noun: "n.",
-  "proper noun": "prop. n.",
-  verb: "v.",
-  adjective: "adj.",
-  adverb: "adv.",
-  pronoun: "pron.",
-  preposition: "prep.",
-  conjunction: "conj.",
-  interjection: "interj.",
-  determiner: "det.",
-  article: "art.",
-  numeral: "num.",
-  particle: "part.",
-  phrase: "phr.",
+  noun: "n",
+  "proper noun": "prop n",
+  verb: "v",
+  adjective: "adj",
+  adverb: "adv",
+  pronoun: "pron",
+  preposition: "prep",
+  conjunction: "conj",
+  interjection: "interj",
+  determiner: "det",
+  article: "art",
+  numeral: "num",
+  particle: "part",
+  phrase: "phr",
 };
 
 function abbreviate(partOfSpeech = ""): string | undefined {
@@ -43,9 +47,36 @@ function abbreviate(partOfSpeech = ""): string | undefined {
   return partOfSpeechAbbreviations[name] ?? (name || undefined);
 }
 
-function equivalents(texts: string[], partOfSpeech?: string): ContentEquivalent[] {
+function primaryText(texts: string[], separator: string): string {
+  let text = texts[0] ?? "";
+  for (const next of texts.slice(1, 3)) {
+    if (text.length + separator.length + next.length > maxPrimaryLength) break;
+    text += separator + next;
+  }
+  return text;
+}
+
+/** Lemma meanings come first; grammatical forms such as `imperative of huse` fold into one collapsed row. */
+function senseEquivalents(senses: WiktionarySense[], partOfSpeech: string): ContentEquivalent[] {
   const abbreviation = abbreviate(partOfSpeech);
-  return texts.map((text) => ({ text, partOfSpeech: abbreviation, prominent: true, frequency: "common" }));
+  const meanings = senses.filter((sense) => !sense.formOf).slice(0, maxSenses);
+  const forms = senses.filter((sense) => sense.formOf);
+  return [
+    ...meanings.map(({ gloss, examples }) => ({
+      text: gloss,
+      partOfSpeech: abbreviation,
+      prominent: true,
+      frequency: "common" as const,
+      firstExampleTranslation: examples[0]?.sentence,
+      examples,
+    })),
+    ...forms.map(({ gloss }) => ({
+      text: gloss,
+      partOfSpeech: abbreviation,
+      prominent: false,
+      frequency: "special-forms" as const,
+    })),
+  ];
 }
 
 /**
@@ -57,16 +88,21 @@ export function buildWiktionaryContent(
   { definitions, translations, pronunciation, forms }: WiktionaryLookup,
 ): DictionaryContent {
   const sections: DictionarySection[] = [];
+  const meanings = definitions.flatMap(({ senses }) => senses.filter((sense) => !sense.formOf));
 
   if (translations.length) {
-    const primary = translations[0].words.slice(0, 3).join(", ");
-    sections.push({ kind: "translation", text: primary, lemma: query.word });
+    sections.push({ kind: "translation", text: primaryText(translations[0].words, ", "), lemma: query.word });
   } else if (definitions.length) {
-    sections.push({ kind: "translation", text: definitions[0].glosses.slice(0, 3).join("; "), lemma: query.word });
+    const glosses = (meanings.length ? meanings : definitions[0].senses).map((sense) => sense.gloss);
+    sections.push({ kind: "translation", text: primaryText(glosses, "; "), lemma: query.word });
   }
   if (!sections.length) return { kind: "dictionary", query, sections };
 
+  // One row per part of speech; alternative conjugations such as `løbe` (løb / løbede) stay on the web page.
+  const seen = new Set<string>();
   for (const { partOfSpeech, forms: headwordForms } of forms) {
+    if (seen.has(partOfSpeech)) continue;
+    seen.add(partOfSpeech);
     sections.push({
       kind: "form-set",
       forms: [{ label: partOfSpeech.toLowerCase(), value: query.word }, ...headwordForms],
@@ -75,6 +111,7 @@ export function buildWiktionaryContent(
 
   if (translations.length) {
     for (const { gloss, partOfSpeech, words } of translations.slice(0, maxGroups)) {
+      const abbreviation = abbreviate(partOfSpeech);
       sections.push({
         kind: "equivalents",
         headword: {
@@ -82,29 +119,29 @@ export function buildWiktionaryContent(
           qualifier: gloss ? `(${gloss})` : undefined,
           partOfSpeech: partOfSpeech?.toLowerCase(),
         },
-        entries: equivalents(words, partOfSpeech),
+        entries: words.map((text) => ({ text, partOfSpeech: abbreviation, prominent: true, frequency: "common" })),
       });
     }
+    // Source-language definitions with their examples, shown in each row's detail.
+    const entries = definitions.flatMap(({ partOfSpeech, senses }) =>
+      senses
+        .filter((sense) => !sense.formOf)
+        .map(({ gloss, examples }) => ({
+          kind: "structured" as const,
+          meanings: [gloss],
+          partOfSpeech: abbreviate(partOfSpeech),
+          examples,
+        })),
+    );
+    if (entries.length) sections.push({ kind: "definitions", entries: entries.slice(0, maxDefinitions) });
   } else {
-    for (const { partOfSpeech, glosses } of definitions.slice(0, maxGroups)) {
+    for (const { partOfSpeech, senses } of definitions.slice(0, maxGroups)) {
       sections.push({
         kind: "equivalents",
         headword: { word: query.word, partOfSpeech: partOfSpeech.toLowerCase() },
-        entries: equivalents(glosses.slice(0, maxGlosses), partOfSpeech),
+        entries: senseEquivalents(senses, partOfSpeech),
       });
     }
-  }
-
-  const examples = definitions.flatMap(({ partOfSpeech, examples }) =>
-    examples.map((example) => ({ ...example, partOfSpeech: abbreviate(partOfSpeech)?.replace(/\.$/, "") })),
-  );
-  if (examples.length) sections.push({ kind: "examples", entries: examples.slice(0, maxExamples) });
-
-  if (translations.length) {
-    const glosses = definitions.flatMap(({ partOfSpeech, glosses }) =>
-      glosses.map((text) => ({ kind: "plain" as const, text, note: abbreviate(partOfSpeech) })),
-    );
-    if (glosses.length) sections.push({ kind: "definitions", entries: glosses.slice(0, 5) });
   }
 
   return {

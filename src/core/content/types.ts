@@ -39,6 +39,8 @@ export interface ContentEquivalent {
   readonly frequency: "common" | "often" | "almost-always" | "less-common" | "special-forms";
   readonly inflectionNote?: string;
   readonly firstExampleTranslation?: string;
+  /** Usage examples shown in the row's detail. */
+  readonly examples?: readonly ContentExample[];
 }
 
 export type DictionarySection =

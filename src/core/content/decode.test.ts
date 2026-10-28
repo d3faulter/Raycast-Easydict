@@ -20,6 +20,7 @@ const dictionary: DictionaryContent = {
         partOfSpeech: "v",
         inflectionNote: "(often used)",
         firstExampleTranslation: "向前走",
+        examples: [{ sentence: "Go ahead.", translation: "向前走" }],
       })),
     },
     {

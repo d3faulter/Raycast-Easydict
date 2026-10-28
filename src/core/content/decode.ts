@@ -130,6 +130,11 @@ function decodeEquivalent(value: unknown, path: string): ContentEquivalent {
     ),
     inflectionNote: optional(source.inflectionNote, text, `${path}.inflectionNote`),
     firstExampleTranslation: optional(source.firstExampleTranslation, text, `${path}.firstExampleTranslation`),
+    examples: optional(
+      source.examples,
+      (value, examplesPath) => array(value, decodeExample, examplesPath),
+      `${path}.examples`,
+    ),
   };
 }
 

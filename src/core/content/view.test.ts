@@ -111,6 +111,39 @@ describe("content view", () => {
     expect(content).toEqual(original);
   });
 
+  it("shows the first example inline and every example in the detail of an equivalent", () => {
+    const [section] = buildContentView(
+      compose(
+        dictionary([
+          {
+            kind: "equivalents",
+            headword: { word: "hyggelig", partOfSpeech: "adjective" },
+            entries: [
+              {
+                text: "cozy",
+                partOfSpeech: "adj",
+                prominent: true,
+                frequency: "common",
+                firstExampleTranslation: "Et hyggeligt hus.",
+                examples: [
+                  { sentence: "Et hyggeligt hus.", translation: "A cozy house." },
+                  { sentence: "Hyggelig aften (i går)." },
+                ],
+              },
+            ],
+          },
+        ]),
+      ),
+      true,
+    );
+    expect(section.items[0].subtitle).toBe("adj.       Et hyggeligt hus.");
+    expect(section.items[0].renderBody()).toBe(
+      ["**cozy**  adj.", "- **Et hyggeligt hus\\.**  \n  A cozy house\\.\n\n- **Hyggelig aften (i går)\\.**"].join(
+        "\n\n",
+      ),
+    );
+  });
+
   it("uses the supplement as the full body when the first dictionary row has an empty subtitle", () => {
     const source = dictionary([
       { kind: "summary", source: "wikipedia", entries: [{ subject: "term", text: "original body" }] },

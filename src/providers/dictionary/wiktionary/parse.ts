@@ -6,10 +6,16 @@ import { parse } from "node-html-parser";
 
 import type { ContentExample } from "@/core/content/types";
 
+export interface WiktionarySense {
+  gloss: string;
+  examples: ContentExample[];
+  /** Grammatical form of another lemma, eg. `imperative of huse`. */
+  formOf: boolean;
+}
+
 export interface WiktionaryDefinitionEntry {
   partOfSpeech: string;
-  glosses: string[];
-  examples: ContentExample[];
+  senses: WiktionarySense[];
 }
 
 export interface WiktionaryTranslationGroup {
@@ -33,16 +39,20 @@ export interface WiktionaryHeadwordForms {
 const htmlEntities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 
 function htmlToText(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, "")
-    .replace(/&(#\d+|#x[\da-f]+|\w+);/gi, (match, entity: string) => {
-      if (entity.startsWith("#x") || entity.startsWith("#X"))
-        return String.fromCodePoint(parseInt(entity.slice(2), 16));
-      if (entity.startsWith("#")) return String.fromCodePoint(parseInt(entity.slice(1), 10));
-      return htmlEntities[entity.toLowerCase()] ?? match;
-    })
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    html
+      // Template styles are embedded in definitions, eg. `<style>.mw-parser-output .defdate{…}</style>`.
+      .replace(/<(style|script)\b[\s\S]*?<\/\1>/gi, "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&(#\d+|#x[\da-f]+|\w+);/gi, (match, entity: string) => {
+        if (entity.startsWith("#x") || entity.startsWith("#X"))
+          return String.fromCodePoint(parseInt(entity.slice(2), 16));
+        if (entity.startsWith("#")) return String.fromCodePoint(parseInt(entity.slice(1), 10));
+        return htmlEntities[entity.toLowerCase()] ?? match;
+      })
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,18 +71,19 @@ export function parseWiktionaryDefinitions(payload: unknown, languageName: strin
     if (!Array.isArray(languageEntries)) continue;
     for (const entry of languageEntries) {
       if (!isRecord(entry) || entry.language !== languageName || !Array.isArray(entry.definitions)) continue;
-      const definitions = entry.definitions.filter(isRecord);
-      const glosses = definitions
-        .map((definition) => (typeof definition.definition === "string" ? htmlToText(definition.definition) : ""))
-        .filter((gloss, index, all) => gloss && all.indexOf(gloss) === index);
-      const examples = definitions.flatMap((definition) =>
-        Array.isArray(definition.parsedExamples)
+      const senses: WiktionarySense[] = [];
+      for (const definition of entry.definitions.filter(isRecord)) {
+        const html = typeof definition.definition === "string" ? definition.definition : "";
+        const gloss = htmlToText(html);
+        if (!gloss || senses.some((sense) => sense.gloss === gloss)) continue;
+        const examples = Array.isArray(definition.parsedExamples)
           ? definition.parsedExamples.filter(isRecord).flatMap(parseExample)
-          : [],
-      );
-      if (glosses.length) {
+          : [];
+        senses.push({ gloss, examples, formOf: html.includes("form-of-definition") });
+      }
+      if (senses.length) {
         const partOfSpeech = typeof entry.partOfSpeech === "string" ? entry.partOfSpeech : "";
-        entries.push({ partOfSpeech, glosses, examples });
+        entries.push({ partOfSpeech, senses });
       }
     }
   }

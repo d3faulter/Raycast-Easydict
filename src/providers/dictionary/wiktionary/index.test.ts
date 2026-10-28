@@ -60,13 +60,18 @@ describe("Wiktionary dictionary", () => {
       kind: "equivalents",
       headword: { word: "hus", partOfSpeech: "noun" },
       entries: [
-        { text: "house", partOfSpeech: "n." },
-        { text: "building", partOfSpeech: "n." },
-        { text: "block of flats, cottage", partOfSpeech: "n." },
-        { text: "shell", partOfSpeech: "n." },
+        { text: "house", partOfSpeech: "n", prominent: true },
+        { text: "building", partOfSpeech: "n", prominent: true },
+        { text: "block of flats, cottage", partOfSpeech: "n", prominent: true },
+        { text: "shell", partOfSpeech: "n", prominent: true },
       ],
     });
-    expect(sections).toContainEqual(expect.objectContaining({ headword: { word: "hus", partOfSpeech: "verb" } }));
+    // "imperative of huse" is a grammatical form, folded into a collapsed row.
+    expect(sections).toContainEqual({
+      kind: "equivalents",
+      headword: { word: "hus", partOfSpeech: "verb" },
+      entries: [{ text: "imperative of huse", partOfSpeech: "v", prominent: false, frequency: "special-forms" }],
+    });
   });
 
   it("shows Danish translations, forms, and examples for an English word", async () => {
@@ -89,7 +94,7 @@ describe("Wiktionary dictionary", () => {
     expect(sections).toContainEqual({
       kind: "equivalents",
       headword: { word: "house", qualifier: "(human abode)", partOfSpeech: "noun" },
-      entries: [{ text: "hus", partOfSpeech: "n.", prominent: true, frequency: "common" }],
+      entries: [{ text: "hus", partOfSpeech: "n", prominent: true, frequency: "common" }],
     });
     expect(sections).toContainEqual(
       expect.objectContaining({
@@ -97,18 +102,63 @@ describe("Wiktionary dictionary", () => {
           qualifier: "(keep within a structure or container)",
           partOfSpeech: "verb",
         }),
-        entries: [expect.objectContaining({ text: "indhuse", partOfSpeech: "v." })],
+        entries: [expect.objectContaining({ text: "indhuse", partOfSpeech: "v" })],
       }),
     );
-    expect(sections).toContainEqual(
-      expect.objectContaining({
-        kind: "examples",
-        entries: expect.arrayContaining([
-          { sentence: "This is my house and my family's ancestral home.", partOfSpeech: "n" },
-        ]),
-      }),
-    );
-    expect(sections.at(-1)).toMatchObject({ kind: "definitions" });
+    expect(sections.map((section) => section.kind)).not.toContain("examples");
+    expect(sections.at(-1)).toMatchObject({
+      kind: "definitions",
+      entries: expect.arrayContaining([
+        {
+          kind: "structured",
+          meanings: [expect.stringContaining("A structure built or serving as an abode of human beings")],
+          partOfSpeech: "n",
+          examples: [{ sentence: "This is my house and my family's ancestral home." }],
+        },
+      ]),
+    });
+  });
+
+  it("puts each meaning's first example inline, strips embedded styles, and keeps long definitions out of the first row", async () => {
+    pages["rest_v1/page/definition/contingency"] = () => ({
+      en: [
+        {
+          partOfSpeech: "Noun",
+          language: "English",
+          definitions: [
+            {
+              definition:
+                'The quality of being contingent. <style data-mw-deduplicate="TemplateStyles:r1">.mw-parser-output .defdate{font-size:smaller}</style>',
+              parsedExamples: [{ example: "The <b>contingency</b> of events.", translation: "Det tilfældige." }],
+            },
+            { definition: "An amount of money paid to the other party (usually the supplier) on breach of contract." },
+          ],
+        },
+      ],
+    });
+    const result = await new WiktionaryDictionaryProvider().request({
+      word: "contingency",
+      fromLanguage: "en",
+      toLanguage: "da",
+    });
+
+    expect(result.content.sections[0]).toEqual({
+      kind: "translation",
+      text: "The quality of being contingent.",
+      lemma: "contingency",
+    });
+    expect(result.content.sections[1]).toMatchObject({
+      kind: "equivalents",
+      entries: [
+        {
+          text: "The quality of being contingent.",
+          firstExampleTranslation: "The contingency of events.",
+          examples: [{ sentence: "The contingency of events.", translation: "Det tilfældige." }],
+        },
+        { text: "An amount of money paid to the other party (usually the supplier) on breach of contract." },
+      ],
+    });
+    delete pages["rest_v1/page/definition/contingency"];
   });
 
   it("uses the Commons MP3 transcode of the first recording for the source language", () => {
