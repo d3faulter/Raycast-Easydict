@@ -4,7 +4,7 @@
 
 ### ✨ New Features
 
-- Added **Search Selected Text**, which reads the selection before Raycast opens and then starts a fresh search. Pressing its hotkey on a new selection replaces a search that is still open, where re-invoking **Search Word** only brings the previous search back.
+- Added **Search Selected Text**, which reads the selection before Raycast opens and then starts a fresh search. Pressing its hotkey on a new selection replaces a search that is still open, where re-invoking **Search Word** only brings the previous search back. With nothing selected, it reopens the last search.
 
 ## [v3.5.0] - 2026-10-02
 
